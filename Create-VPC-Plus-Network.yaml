@@ -186,6 +186,26 @@ Resources:
         - Key: Name
           Value: No_Ingress_SecGrp
 
+# Web Server Security Group
+  WebSrvSecGrp:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupName: "webserver-ingress"
+      GroupDescription: "Web Server Security Group"
+      VpcId: !Ref vpc
+      Tags:
+        - Key: "Name"
+          Value: Http_Ingress_SecGrp
+      SecurityGroupIngress:
+        - CidrIp: "0.0.0.0/0"
+          FromPort: "80"
+          IpProtocol: "tcp"
+          ToPort: "80"
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: '0.0.0.0/0'
+      
+############
 Outputs:
   VPC:
     Description: A reference to the created VPC
