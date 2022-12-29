@@ -1,0 +1,112 @@
+# CF YAML to build EC2 WebServer, SecGrp, and attach to VPC resources
+# - Using cross-stack references to the VPC creation module
+      
+# Use at your own peril, and be mindful of the AWS costs of 
+#   building this environment.  
+#   -- Dan Edeen, dan@dsblue.net, 2022  --   
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+    This stack creates and configures an EC2-based webserver. 
+
+Parameters: 
+  VPCStackName:
+    Description: Name of the base VPC stack
+    Type: String
+    Default: VPC-Base-Stack
+  
+  OwnerTag:
+    Description: Using tags to track resources built
+    Type: String
+    Default: dan-via-cloudformation
+
+  KeyPairName:
+    Description: Name of previously created EC2 KeyPair
+    Type: 'AWS::EC2::KeyPair::KeyName'  # standard type
+    ConstraintDescription: Key name must match existing KeyPair in AWS Acct.
+
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: t2.micro
+
+  InstanceImageId:
+    Description: EC2 Image Id from this region
+    Type: AWS::EC2::Image::Id
+    Default: ami-094125af156557ca2 # Exists in us-west-2 (oregon) region
+
+Resources: 
+# Create Key Pair for EC2 Instances 
+  NewKeyPair:
+    Type: 'AWS::EC2::KeyPair'
+    Properties:
+      KeyName: KeyPair101
+
+# Web Server Security Group
+  WebSrvSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupName: "webserver-SG"
+      GroupDescription: "http and ssh ingress"
+      VpcId:
+        Fn::ImportValue: !Sub "${VPCStackName}-VPCID" 
+      SecurityGroupIngress:
+        # http
+        - IpProtocol: "tcp"
+          FromPort: "80"
+          ToPort: "80"
+          CidrIp: "0.0.0.0/0"
+        # ssh
+        - IpProtocol: "tcp"
+          FromPort: "80"
+          ToPort: "80"
+          CidrIp: "0.0.0.0/0"
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: '0.0.0.0/0'
+      Tags:
+        - Key: "Name"
+          Value: webserver-SG
+
+# EC2-based Web Server 
+  EC2Instance:
+    Type: AWS::EC2::Instance 
+    Properties:
+      InstanceType: !Ref InstanceType
+      SubnetID: Fn::ImportValue !Sub "${VPCStackName}-PublicSubnet1"
+        #'Fn::Sub': '${VPC-Base-Stack}-PublicSubnet1'
+      SecurityGroupIds:
+        - !Ref WebSrvSG
+      KeyName: !Ref NewKeyPair
+      ImageID: !Ref InstanceImageId
+      UserData: 
+        Fn::Base64: 
+          !Sub  |
+          #!/bin/bash -xe
+          yum update -y 
+          sudo amazon-linux-extras install php8.0 mariadb10.5 -y
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+                
+      Tags: 
+       - Key: Name
+         Value: WebServer
+    
+############
+Outputs:
+  InstanceId:
+    Description: InstanceId of the first EC2 instance
+    Value: !Ref EC2Instance
+
+  PublicDNS:
+    Description: Public DNS Name of the EC2 instance
+    Value: !GetAtt 
+      - EC2Instance
+      - PublicDnsName
+
+  PublicIP:
+    Description: Public IP address of the EC2 instance
+    Value: !GetAtt 
+      - EC2Instance
+      - PublicIp
