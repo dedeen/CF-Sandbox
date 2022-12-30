@@ -1,5 +1,3 @@
-
-
 #!/bin/bash
 Region=$AWS_REGION
 #Region="us-west-2"
@@ -12,43 +10,18 @@ then
   exit 0 
 fi
 
-echo "operating in region: $Region"
-echo "Desired key = $Desired_key"
-Available_keys=`aws ec2 describe-key-pairs --region $Region | grep KeyName`
-echo "Found keys:  $Available_keys"
+Existing_key=`aws ec2 describe-key-pairs --region $Region --key-name "$Desired_key" 2>/dev/null | grep KeyName | awk -F\" '{print $4}'`
+#echo ":"
+#echo ">>$Desired_key<<"
+#echo "--$Existing_key--"
 
-#####
-
-#!/bin/bash
-Region=eu-central-1
-key=myapp-engine-$Region
-Available_key=`aws ec2 describe-key-pairs --key-name $key | grep KeyName | awk -F\" '{print $4}'`
-
-if [ "$key" = "$Available_key" ]; then
-    echo "Key is available."
+if [[ "$Desired_Key" != "$Existing_key" ]]
+then
+  echo "Key-pair ("$Desired_key") already exists in Acct/Region, will use it for EC2s."
 else
-    echo "Key is not available: Creating new key"
-    aws ec2 create-key-pair --key-name $key --region $Region > myapp-engine-$Region.pem
-    aws s3 cp myapp-engine-$Region.pem s3://mybucket/myapp-engine-$Region.pem
+  echo "Will create key-pair ("$Desired_key") and use for EC2s in this Acct/Region."
+  aws ec2 create-key-pair --key-name "$Desired_key" --query "KeyMaterial" --region $Region --output text > "${Desired_key}.pem"
+  #aws ec2 create-key-pair --key-name "$Desired_key" --query "KeyMaterial" --region $Region --output text
 fi
-###############
 
-/usr/local/bin/aws cloudformation deploy  --stack-name myapp-engine --template-file ./lc.yml --parameter-overrides file://./config.json  --region $Region
-##### create stack  #########
-
-
-Below is an example of a CloudFormation launch configuration stack where you can pass the key.
-
-Resources:
-  renderEnginelc:
-    Type: AWS::AutoScaling::LaunchConfiguration
-    Properties:
-      ImageId:
-        Ref: "AMIID"
-      SecurityGroups:
-        - Fn::ImportValue:
-            !Sub "${SGStackName}-myapp"
-      InstanceType:
-        Ref: InstanceType
-      LaunchConfigurationName : !Join [ "-", [ !Ref Environment, !Ref ApplicationName, lc ] ]
-      KeyName: !Join [ "-", [ !Ref KeyName, !Ref AWS::Region ] ]
+##############
