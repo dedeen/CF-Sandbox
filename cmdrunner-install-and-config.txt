@@ -3,3 +3,6 @@ cd aws-cloudformation-resource-providers-awsutilities-commandrunner
 curl -LO https://github.com/aws-cloudformation/aws-cloudformation-resource-providers-awsutilities-commandrunner/releases/latest/download/awsutility-cloudformation-commandrunner.zip
 
 ####
+aws configure set region us-west-2
+./scripts/register.sh --set-default
+
