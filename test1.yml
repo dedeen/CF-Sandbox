@@ -37,6 +37,14 @@ Parameters:
     Default: 192.168.3.0/24
 
 Resources: 
+  CommandRunner:
+    Type: 'AWSUtility::CloudFormation::CommandRunner'
+    Properties: 
+      #Command: 'aws ec2 describe-vpcs --region us-west-2 --query Vpcs[0].VpcId --output text  > /command-output.txt'
+      Command: 'aws ec2 describe-vpcs --region us-west-2 --query Vpcs[0].VpcId --output text'
+      Command: 'ls'
+      Timeout: 10
+##>>
   VPC:
     Type: AWS::EC2::VPC
     Properties: 
