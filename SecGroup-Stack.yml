@@ -1,0 +1,75 @@
+# CF YAML to build Security Groups and attach to VPC
+# - Using cross-stack references from the VPC creation module
+#   -- Dan Edeen, dan@dsblue.net, 2022  --   
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+    This stack creates and configures AWS security groups.  
+
+Parameters: 
+  VPCStackName:
+    Description: Name of the base VPC stack
+    Type: String
+    Default: VPC-Base-Stack
+  
+  OwnerTag:
+    Description: Using tags to track resources built
+    Type: String
+    Default: dan-via-cloudformation
+
+  #KeyPairName:
+  #  Description: Name of previously created EC2 KeyPair
+  #  Type: 'AWS::EC2::KeyPair::KeyName'  # standard type
+  #  ConstraintDescription: Key name must match existing KeyPair in AWS Acct.
+
+  #InstanceType:
+  #  Description: EC2 instance type
+  #  Type: String
+  #  Default: t2.micro
+
+  #InstanceImageId:
+  #  Description: EC2 Image Id from this region
+  #  Type: AWS::EC2::Image::Id
+  #  Default: ami-094125af156557ca2 # Exists in us-west-2 (oregon) region
+
+Resources: 
+# Create Key Pair for EC2 Instances 
+  NewKeyPair:
+    Type: 'AWS::EC2::KeyPair'
+    Properties:
+      KeyName: KeyPair101
+
+# Web Server Security Group
+  WebSrvSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupName: "webserver-SG"
+      GroupDescription: "http and ssh ingress"
+      VpcId:
+        Fn::ImportValue: !Sub "${VPCStackName}-VPCID-csrx" 
+      SecurityGroupIngress:
+        # http
+        - IpProtocol: "tcp"
+          FromPort: "80"
+          ToPort: "80"
+          CidrIp: "0.0.0.0/0"
+        # ssh
+        - IpProtocol: "tcp"
+          FromPort: "80"
+          ToPort: "80"
+          CidrIp: "0.0.0.0/0"
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: '0.0.0.0/0'
+      Tags:
+        - Key: "Name"
+          Value: webserver-SG
+############
+Outputs: 
+  WebServerSGName:
+    Description: Export the web server SG for EC2 creation
+    Value: !Ref WebSrvSG
+    Export: 
+      Name:
+        'Fn::Sub': '${AWS::StackName}-SecurityGroupID-csrx'
+############

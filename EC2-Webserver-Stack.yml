@@ -1,0 +1,90 @@
+# CF YAML to build EC2 WebServer, attach to secgrp and vpc already created. 
+# - Using cross-stack references to the VPC creation module
+#   -- Dan Edeen, dan@dsblue.net, 2022  --   
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+    This stack creates and configures an EC2-based webserver. 
+
+Parameters: 
+  VPCStackName:
+    Description: Name of the base VPC stack
+    Type: String
+    Default: VPC-Base-Stack
+
+  SecGrpStackName:
+    Description: Name of the stack that created the SGs
+    Type: String
+    Default: SecGrp-Stack
+  
+  OwnerTag:
+    Description: Using tags to track resources built
+    Type: String
+    Default: dan-via-cloudformation
+
+  KeyPairName:
+    Description: Name of previously created EC2 KeyPair
+    Type: 'AWS::EC2::KeyPair::KeyName'  # standard type
+    Default: keydan11
+    ConstraintDescription: Key name must match existing KeyPair in AWS Acct.
+
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: t2.micro
+
+  InstanceImageId:
+    Description: EC2 Image Id from this region
+    Type: AWS::EC2::Image::Id
+    Default: ami-094125af156557ca2 # Exists in us-west-2 (oregon) region
+
+Resources: 
+# Create Key Pair for EC2 Instances 
+#  NewKeyPair:
+#    Type: 'AWS::EC2::KeyPair'
+#    Properties:
+#      KeyName: KeyPair101
+
+
+# EC2-based Web Server 
+  EC2Instance:
+    Type: AWS::EC2::Instance 
+    Properties:
+      InstanceType: !Ref InstanceType
+      SubnetId:
+        Fn::ImportValue: !Sub "${VPCStackName}-PublicSubnet1-csrx" 
+      SecurityGroupIds: 
+        - Fn::ImportValue: !Sub "${SecGrpStackName}-SecurityGroupID-csrx" 
+      KeyName: !Ref KeyPairName
+      ImageId: !Ref InstanceImageId
+      UserData: 
+        Fn::Base64: 
+          !Sub  |
+          #!/bin/bash -xe
+          yum update -y 
+          sudo amazon-linux-extras install php8.0 mariadb10.5 -y
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+                
+      Tags: 
+       - Key: Name
+         Value: WebServer
+    
+############
+Outputs:
+  InstanceId:
+    Description: InstanceId of the first EC2 instance
+    Value: !Ref EC2Instance
+
+  PublicDNS:
+    Description: Public DNS Name of the EC2 instance
+    Value: !GetAtt 
+      - EC2Instance
+      - PublicDnsName
+
+  PublicIP:
+    Description: Public IP address of the EC2 instance
+    Value: !GetAtt 
+      - EC2Instance
+      - PublicIp
